@@ -40,9 +40,22 @@ class MosquitoTurretEnv(gym.Env):
         self.mosq_vel += np.random.uniform(-0.005, 0.005, 2) # Wind/Zags
         self.mosq_vel = np.clip(self.mosq_vel, -0.05, 0.05)
 
-        # 4. Calculate Reward
+        # Calculate Reward
         dist = np.linalg.norm(self.turret_pos - self.mosq_pos)
-        reward = -dist # Distance penalty
+
+        # 1. The Core Reward (Distance)
+        reward = -dist 
+
+        # 2. The "Sniper" Bonus (Exponential)
+        # This gives much higher rewards for being PERFECTLY on target 
+        # versus just "close."
+        reward += np.exp(-dist * 10) 
+
+        # 3. The Stability Penalty (Crucial for Arduino!)
+        # Penalize the AI for moving too fast/jerky.
+        # 'action' is the change in position.
+        reward -= 0.1 * np.linalg.norm(action)
+        
         if dist < 0.05: reward += 5.0 # Hit bonus
 
         # 5. End conditions

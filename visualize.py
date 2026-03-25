@@ -6,7 +6,9 @@ from simulations.mosquito_env import MosquitoTurretEnv
 
 # 1. Load the Environment and the Brain
 env = MosquitoTurretEnv()
-model = PPO.load("models/mosquito_pilot_v1")
+
+filename="mosquito_pilot_v2"
+model = PPO.load(f"models/{filename}")
 
 # 2. Setup the Plotting Window
 plt.ion() # Interactive mode ON

@@ -16,11 +16,16 @@ print("Environment check passed! Starting training...")
 
 # 3. Build the Brain
 # We use MlpPolicy (standard neural network)
-model = PPO("MlpPolicy", env, verbose=1, device="cpu", tensorboard_log="./logs/")
+model = PPO("MlpPolicy", env, verbose=1,
+            ent_coef=0.01, 
+            learning_rate=0.0003, 
+            device="cpu", 
+            tensorboard_log="./logs/")
 
-# 4. Training (Start with 100k steps to test)
-model.learn(total_timesteps=100000)
+# 4. Training
+model.learn(total_timesteps=500000)
 
 # 5. Save the result
-model.save("models/mosquito_pilot_v1")
-print("Brain saved to models/mosquito_pilot_v1.zip")
+filename="mosquito_pilot_v2"
+model.save(f"models/{filename}")
+print(f"Brain saved to models/{filename}")

@@ -2,47 +2,52 @@ import gymnasium as gym
 import numpy as np
 import matplotlib.pyplot as plt
 from stable_baselines3 import PPO
+from stable_baselines3.common.vec_env import DummyVecEnv, VecFrameStack
 from simulations.mosquito_env import MosquitoTurretEnv
 
-# 1. Load the Environment and the Brain
-env = MosquitoTurretEnv()
+# 1. Load and Wrap the Environment (Must match train.py exactly)
+base_env = MosquitoTurretEnv()
+env = DummyVecEnv([lambda: base_env])
+env = VecFrameStack(env, n_stack=4)
 
-filename="mosquito_pilot_v2"
-model = PPO.load(f"models/{filename}")
+filename = "mosquito_pilot_v4"
+model = PPO.load(f"models/{filename}", env=env)
 
 # 2. Setup the Plotting Window
-plt.ion() # Interactive mode ON
+plt.ion()
 fig, ax = plt.subplots(figsize=(6, 6))
 ax.set_xlim(-1.2, 1.2)
 ax.set_ylim(-1.2, 1.2)
-ax.set_title("AI Mosquito Turret: Live Tracking")
+ax.set_title("AI Mosquito Turret v3: Motion-Aware Tracking")
 
-# Create visual markers
 turret_marker, = ax.plot([], [], 'ro', markersize=10, label="Turret (Laser)")
 mosq_marker, = ax.plot([], [], 'g*', markersize=8, label="Mosquito")
 ax.legend()
 
 # 3. The Visualization Loop
-obs, _ = env.reset()
-for _ in range(500): # Watch 500 frames
-    # Tell the brain to predict the next move
+obs = env.reset() # VecEnv reset returns just the obs
+for _ in range(1000): 
     action, _states = model.predict(obs, deterministic=True)
     
-    # Step the environment
-    obs, reward, terminated, truncated, info = env.step(action)
+    # VecEnv returns 4 values: obs, rewards, dones, infos
+    obs, rewards, dones, infos = env.step(action)
     
-    # Extract positions from the observation [T_x, T_y, M_x, M_y, V_x, V_y]
-    t_x, t_y, m_x, m_y = obs[0], obs[1], obs[2], obs[3]
+    # --- DATA EXTRACTION ---
+    # obs[0] is our one environment. It contains 24 numbers.
+    # The LATEST frame is the last 6 numbers in that stack.
+    latest_frame = obs[0][-6:] 
+    t_x, t_y, m_x, m_y = latest_frame[0], latest_frame[1], latest_frame[2], latest_frame[3]
     
-    # Update the dots on the screen
+    # Update markers
     turret_marker.set_data([t_x], [t_y])
     mosq_marker.set_data([m_x], [m_y])
     
     plt.draw()
-    plt.pause(0.01) # Controls the "speed" of the simulation
+    plt.pause(0.01)
     
-    if terminated:
-        obs, _ = env.reset()
+    # VecEnv automatically resets when 'dones' is True
+    if dones[0]:
+        print("Target Hit or Reset!")
 
 plt.ioff()
 plt.show()

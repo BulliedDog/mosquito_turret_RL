@@ -22,10 +22,21 @@ class MosquitoTurretEnv(gym.Env):
         self.turret_pos = np.array([0.0, 0.0], dtype=np.float32)
         self.mosq_pos = np.random.uniform(-0.6, 0.6, 2).astype(np.float32)
         self.mosq_vel = np.random.uniform(-0.03, 0.03, 2).astype(np.float32)
+
+        self.prev_dist = np.linalg.norm(self.turret_pos - self.mosq_pos)
+        
         return self._get_obs(), {}
 
     def _get_obs(self):
-        return np.concatenate([self.turret_pos, self.mosq_pos, self.mosq_vel]).astype(np.float32)
+        # Calculate where the mosquito WILL be when the laser actually moves
+        predicted_mosq_pos = self.mosq_pos + (self.mosq_vel * self.latency)
+        
+        # Concatenate: [Turret, Predicted_Mosq, Velocity]
+        return np.concatenate([
+            self.turret_pos, 
+            predicted_mosq_pos, # Feed the AI the FUTURE, not the past
+            self.mosq_vel
+        ]).astype(np.float32)
 
     def step(self, action):
         # 1. Handle Latency
@@ -45,6 +56,19 @@ class MosquitoTurretEnv(gym.Env):
 
         # 1. The Core Reward (Distance)
         reward = -dist 
+
+        # If the turret is moving fast while it's close to the mosquito, 
+        # we penalize it. This stops the "orbiting."
+        turret_vel = np.linalg.norm(action)
+        if dist < 0.15: # Start braking earlier
+            reward -= turret_vel * 5.0  # Increased from 2.0
+        
+        # We reward the AI if its movement actually reduces the distance.
+        # (This is like "Hotter/Colder")
+        prev_dist = getattr(self, 'prev_dist', dist)
+        if dist < prev_dist:
+            reward += 0.2
+        self.prev_dist = dist
 
         # 2. The "Sniper" Bonus (Exponential)
         # This gives much higher rewards for being PERFECTLY on target 
